@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Isolated Italy: access to essential services</title>
+    <meta
+      name="description"
+      content="Modelled residents, 164,000 essential services, real road travel times from Amazon Location Service. Find the places in Italy that sit far from a pharmacy, a doctor, a school, a shop and a post office."
+    />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Cpath d=%27M16 2l12 7v14l-12 7-12-7V9z%27 fill=%27%23fde047%27/%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <div id="map"></div>
+    <aside id="panel">
+      <header>
+        <button id="toggle" aria-label="Show or hide the panel">Menu</button>
+        <h1>Isolated Italy</h1>
+        <p class="sub" id="sub">Where essential services are out of reach.</p>
+      </header>
+      <button id="hero" class="hero">
+        <b>535 k vs 159 k</b
+        ><span
+          >Each open pharmacy source alone says about 535,000 Italians live more than 5 km from a pharmacy. They agree
+          on only 159,000. Tap to see where they disagree.</span
+        >
+      </button>
+      <section id="headline"></section>
+      <section class="ctl">
+        <label
+          >Show
+          <select id="metric">
+            <option value="count">Services out of reach (0 to 5)</option>
+            <option value="pharmacy">Distance to pharmacy</option>
+            <option value="health">Distance to doctor / hospital</option>
+            <option value="school">Distance to school</option>
+            <option value="grocery">Distance to grocery</option>
+            <option value="post">Distance to post office</option>
+            <option value="train">Distance to train station</option>
+            <option value="conflict">Pharmacies: where the two sources disagree</option>
+          </select>
+        </label>
+        <label
+          >“Out of reach” beyond <b id="thrv">5</b> km
+          <input id="thr" type="range" min="0" max="10" step="1" value="4" />
+        </label>
+        <label class="chk"><input id="ext" type="checkbox" /> Extrude by residents</label>
+      </section>
+      <section>
+        <input
+          id="search"
+          type="search"
+          placeholder="Search a comune…  (e.g. Bellino, Gela)"
+          autocomplete="off"
+          list="comlist"
+        />
+        <datalist id="comlist"></datalist>
+      </section>
+      <section id="places">
+        <h2>Top sites for a new pharmacy</h2>
+        <div id="chips"></div>
+      </section>
+      <section id="tourbox">
+        <button id="tour">Take the 60-second tour</button>
+      </section>
+      <section id="sites">
+        <h2>Where to build next <small>(25 best sites per service, checked with road routing)</small></h2>
+        <div class="tabs">
+          <button data-cat="pharmacy">Pharmacy</button><button data-cat="health">Doctor / hospital</button
+          ><button data-cat="school">School</button>
+        </div>
+        <p id="sitesum" class="hint"></p>
+        <ol id="sitelist"></ol>
+        <button id="sitecsv" hidden class="sec">Download these sites (CSV)</button>
+      </section>
+      <p class="hint tip1">
+        Click anywhere on the map: we ask Amazon Location Service how far you really are by road, and what you can reach
+        in 15 minutes.
+      </p>
+      <section>
+        <h2>Most affected localities <small>(share of residents with ≥3 of 5 services out of reach)</small></h2>
+        <ol id="rank"></ol>
+      </section>
+      <footer id="foot"></footer>
+    </aside>
+    <aside id="detailbox" hidden>
+      <button id="dclose" aria-label="Close">×</button>
+      <div id="detail" aria-live="polite"></div>
+    </aside>
+    <div id="legend"></div>
+    <div id="caption" aria-live="polite"></div>
+    <div id="banner"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
