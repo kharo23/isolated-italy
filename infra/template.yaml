@@ -1,0 +1,132 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Isolated Italy. Static site (S3, CloudFront), reach API (Lambda, DynamoDB daily cap), Cognito identity pool for signed Amazon Location map requests.
+Metadata:
+  cfn-lint:
+    config:
+      # The linter knows only two geo-maps actions; the style, glyph and sprite actions below are valid IAM actions.
+      ignore_checks: [W3037]
+Parameters:
+  DailyCap: { Type: Number, Default: 1000, Description: Max Amazon Location Routes calls per UTC day }
+Resources:
+  SiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration: { BlockPublicAcls: true, BlockPublicPolicy: true, IgnorePublicAcls: true, RestrictPublicBuckets: true }
+      LifecycleConfiguration:
+        Rules: [ { Id: expire-cache, Prefix: reach-cache/, Status: Enabled, ExpirationInDays: 30 } ]
+  CapTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: [ { AttributeName: day, AttributeType: S } ]
+      KeySchema: [ { AttributeName: day, KeyType: HASH } ]
+      TimeToLiveSpecification: { AttributeName: ttl, Enabled: true }
+  ReachRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement: [ { Effect: Allow, Principal: { Service: lambda.amazonaws.com }, Action: sts:AssumeRole } ]
+      ManagedPolicyArns: [ arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole ]
+      Policies:
+        - PolicyName: reach
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - { Effect: Allow, Action: [ "geo-routes:CalculateIsolines", "geo-routes:CalculateRoutes" ], Resource: !Sub "arn:aws:geo-routes:${AWS::Region}::provider/default" }
+              - { Effect: Allow, Action: [ "s3:GetObject", "s3:PutObject" ], Resource: !Sub "${SiteBucket.Arn}/reach-cache/*" }
+              - { Effect: Allow, Action: dynamodb:UpdateItem, Resource: !GetAtt CapTable.Arn }
+  ReachFn:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.13
+      Handler: reach.handler
+      Role: !GetAtt ReachRole.Arn
+      Timeout: 25
+      MemorySize: 256
+      Environment: { Variables: { CACHE_BUCKET: !Ref SiteBucket, CAP_TABLE: !Ref CapTable, DAILY_CAP: !Ref DailyCap, LOCATION_REGION: !Ref "AWS::Region" } }
+      Code: { ZipFile: "def handler(e, c): return {'statusCode': 503}" }   # replaced by deploy.sh (aws lambda update-function-code)
+  ReachUrl:
+    Type: AWS::Lambda::Url
+    Properties: { TargetFunctionArn: !Ref ReachFn, AuthType: NONE }
+  ReachUrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties: { FunctionName: !Ref ReachFn, Action: lambda:InvokeFunctionUrl, Principal: "*", FunctionUrlAuthType: NONE }
+  ReachInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties: { FunctionName: !Ref ReachFn, Action: lambda:InvokeFunction, Principal: "*", InvokedViaFunctionUrl: true }
+  OAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig: { Name: !Sub "${AWS::StackName}-oac", OriginAccessControlOriginType: s3, SigningBehavior: always, SigningProtocol: sigv4 }
+  Dist:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        HttpVersion: http2and3
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: site
+            DomainName: !GetAtt SiteBucket.RegionalDomainName
+            S3OriginConfig: { OriginAccessIdentity: "" }
+            OriginAccessControlId: !GetAtt OAC.Id
+          - Id: api
+            DomainName: !Select [2, !Split ["/", !GetAtt ReachUrl.FunctionUrl]]
+            CustomOriginConfig: { OriginProtocolPolicy: https-only }
+        DefaultCacheBehavior:
+          TargetOriginId: site
+          ViewerProtocolPolicy: redirect-to-https
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6   # CachingOptimized
+        CacheBehaviors:
+          - PathPattern: /api/*
+            TargetOriginId: api
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [ GET, HEAD ]
+            Compress: true
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad   # CachingDisabled (the Lambda caches in S3)
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac  # AllViewerExceptHostHeader
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: cloudfront.amazonaws.com }
+            Action: s3:GetObject
+            Resource: !Sub "${SiteBucket.Arn}/*"
+            Condition: { StringEquals: { "AWS:SourceArn": !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${Dist}" } }
+  MapPool:
+    Type: AWS::Cognito::IdentityPool
+    Properties: { IdentityPoolName: !Sub "${AWS::StackName}_map", AllowUnauthenticatedIdentities: true }
+  MapRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Federated: cognito-identity.amazonaws.com }
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals: { "cognito-identity.amazonaws.com:aud": !Ref MapPool }
+              ForAnyValue:StringLike: { "cognito-identity.amazonaws.com:amr": unauthenticated }
+      Policies:
+        - PolicyName: map-read
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - { Effect: Allow, Action: [ "geo-maps:GetTile", "geo-maps:GetStaticMap", "geo-maps:GetGlyphs", "geo-maps:GetSprites", "geo-maps:GetStyleDescriptor" ], Resource: !Sub "arn:aws:geo-maps:${AWS::Region}::provider/default" }
+  MapPoolRoles:
+    Type: AWS::Cognito::IdentityPoolRoleAttachment
+    Properties: { IdentityPoolId: !Ref MapPool, Roles: { unauthenticated: !GetAtt MapRole.Arn } }
+Outputs:
+  SiteUrl: { Value: !Sub "https://${Dist.DomainName}" }
+  Bucket: { Value: !Ref SiteBucket }
+  DistributionId: { Value: !Ref Dist }
+  FunctionName: { Value: !Ref ReachFn }
+  IdentityPoolId: { Value: !Ref MapPool }
