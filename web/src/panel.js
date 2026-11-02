@@ -22,7 +22,7 @@ export function renderHeadline() {
   const disagree = h.pharm_only_overture_says_near + h.pharm_only_register_says_near;
   $("headline").innerHTML =
     `<div class="big"><b>${formatCompact(h.pharm_both)}</b><span>residents live more than ${h.thr_km} km from a pharmacy in ` +
-    `<u>both</u> open sources. Each source alone says about ${formatCompact((registerFar + overtureFar) / 2)}: they disagree on ` +
+    `<u>both</u> open sources. Each source alone says about ${formatCompact(Math.round((registerFar + overtureFar) / 2 / 5000) * 5000)}: they disagree on ` +
     `${formatCompact(disagree)} people.</span></div>` +
     `<div class="row"><div><b>${formatCompact(h.far1)}</b><span>${percent(h.far1)}% over ${h.thr_km} km from at least one of five services</span></div>` +
     `<div><b>${formatCompact(h.far3)}</b><span>from three or more</span></div></div>` +
