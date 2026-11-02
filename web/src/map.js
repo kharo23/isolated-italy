@@ -5,7 +5,7 @@ import { MapboxOverlay } from "@deck.gl/mapbox";
 import * as maplibregl from "maplibre-gl";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { AWS_REGION, FALLBACK_STYLE, IDENTITY_POOL_ID, ITALY_CENTER } from "./config.js";
+import { AWS_REGION, FALLBACK_STYLE, IDENTITY_POOL_ID, ITALY_BOUNDS, ITALY_CENTER } from "./config.js";
 import { $, isMobile } from "./util.js";
 
 maplibregl.setWorkerUrl(workerUrl);
@@ -48,6 +48,24 @@ map.on("error", (event) => {
     $("banner").textContent = "Basemap style unavailable, using a placeholder.";
   }
 });
+
+/** Fit Italy in the area not covered by the side panel (bottom sheet on small screens). */
+export function showItaly(animate = true) {
+  const mobile = isMobile();
+  map.fitBounds(
+    [
+      [ITALY_BOUNDS.west + 0.4, ITALY_BOUNDS.south + 1.2],
+      [ITALY_BOUNDS.east - 0.4, ITALY_BOUNDS.north - 0.1],
+    ],
+    {
+      padding: mobile
+        ? { top: 90, left: 8, right: 8, bottom: Math.round(window.innerHeight * 0.5) }
+        : { top: 20, left: 400, right: 20, bottom: 20 },
+      animate,
+      duration: 1200,
+    },
+  );
+}
 
 export const overlay = new MapboxOverlay({ interleaved: false, layers: [] });
 map.addControl(overlay);

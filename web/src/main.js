@@ -5,7 +5,7 @@ import { analyse, handleMapClick } from "./analysis.js";
 import { fetchJson, loadCoreData } from "./api.js";
 import { applyHash, syncHash } from "./hash.js";
 import { render } from "./layers.js";
-import { map } from "./map.js";
+import { map, showItaly } from "./map.js";
 import { initControls, initSearch, renderFooter, renderHeadline, renderRanking, renderSubtitle } from "./panel.js";
 import { initPlaces } from "./places.js";
 import { initSites, openSites, pickSiteAt, selectSite } from "./sites.js";
@@ -22,6 +22,7 @@ async function start() {
   map.on("click", (event) => {
     if (!isTouring()) handleMapClick(event, { onSiteHit: pickSiteAt });
   });
+  if (!location.hash.includes("v=")) showItaly(false);
   applyHash();
   syncHash();
 

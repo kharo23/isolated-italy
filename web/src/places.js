@@ -1,13 +1,12 @@
 /** Ready-made entry points: the featured example and the top pharmacy sites. */
 
 import { analyse } from "./analysis.js";
-import { ITALY_CENTER } from "./config.js";
 import { render } from "./layers.js";
-import { map } from "./map.js";
+import { map, showItaly } from "./map.js";
 import { setMetric } from "./panel.js";
 import { closeSites } from "./sites.js";
 import { stopTour } from "./tourRunner.js";
-import { $, esc, isMobile } from "./util.js";
+import { $, esc } from "./util.js";
 
 /** The first six pharmacy sites; their routing answers are pre-warmed in the cache. */
 const PLACES = [
@@ -35,6 +34,6 @@ export function initPlaces() {
   $("hero").onclick = () => {
     setMetric("conflict");
     render();
-    map.flyTo({ center: ITALY_CENTER, zoom: isMobile() ? 4.2 : 5.3, duration: 1200 });
+    showItaly();
   };
 }
